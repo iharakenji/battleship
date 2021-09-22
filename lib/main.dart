@@ -1,13 +1,22 @@
 import 'dart:math';
+import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:tuple/tuple.dart';
 
 void main() => runApp(BattleshipApp());
 
 class BattleshipApp extends StatelessWidget {
-  final int rows, columns;
+  final int rows, columns, waves;
+  late final List<Ship> ships;
 
-  const BattleshipApp({this.columns = 10, this.rows = 10});
+  BattleshipApp({this.columns = 10, this.rows = 10, this.waves = 2}) {
+    ships = [
+      const Ship(4, 1),
+      const Ship(3, 2),
+      const Ship(2, 3),
+      const Ship(1, 4)
+    ];
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -15,32 +24,39 @@ class BattleshipApp extends StatelessWidget {
           appBar: AppBar(
             title: const Text('BattleshipPuzzle'),
           ),
-          body: _BattleshipHome(rows, columns),
+          body: _BattleshipHome(rows, columns, ships, waves),
         ),
       );
 }
 
 class _BattleshipHome extends StatefulWidget {
-  final int _rows, _columns;
+  final int _rows, _columns, _waves;
+  final List<Ship> _ships;
 
-  const _BattleshipHome(this._rows, this._columns);
+  const _BattleshipHome(this._rows, this._columns, this._ships, this._waves);
 
   @override
-  _BattleshipHomeState createState() => _BattleshipHomeState(_columns, _rows);
+  _BattleshipHomeState createState() =>
+      _BattleshipHomeState(_columns, _rows, _ships, _waves);
 }
 
 class _BattleshipHomeState extends State<_BattleshipHome> {
-  final int _rows, _columns;
+  final int _rows, _columns, _waves;
+  final List<Ship> _ships;
   var _tapCount = 0;
+  late int _remainCount;
   late List<List<CellType>> _cellTypes;
   late List<List<bool>> _tapped;
 
-  _BattleshipHomeState(this._rows, this._columns);
+  _BattleshipHomeState(this._rows, this._columns, this._ships, this._waves);
 
   @override
   void initState() {
     super.initState();
-    _cellTypes = CellTypeGenerator.generate(_rows, _columns);
+    _remainCount = _ships
+        .map((e) => e.size * e.num)
+        .reduce((value, element) => value + element);
+    _cellTypes = _CellTypeGenerator(_rows, _columns, _ships, _waves).generate();
     _tapped =
         List.generate(_rows, (_) => List.generate(_columns, (_) => false));
   }
@@ -52,30 +68,57 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
 
   Widget _buildContainer() => Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 20, 0, 20),
-            child: Text('TapCount: $_tapCount'),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 20),
-            child: ElevatedButton(
+          const SizedBox(height: 20),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            ElevatedButton(
               onPressed: () => _pushReset(),
               child: const Text('Reset'),
             ),
-          ),
-          Container(
+            const SizedBox(width: 20),
+            Text('TapCount: $_tapCount'),
+          ]),
+          const SizedBox(height: 20),
+          SizedBox(
             width: 440,
             height: 440,
-            child: _buildColumn(),
+            child: Stack(
+              children: [
+                Center(
+                  child: Container(
+                    child: _buildClearText(),
+                  ),
+                ),
+                _buildColumn(),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+            child: _buildBottom(),
           ),
         ]),
       );
+
+  Widget? _buildClearText() {
+    if (_remainCount == 0) {
+      return Text(
+        "Clear!!",
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 50.0,
+          color: Colors.pink[500],
+        ),
+      );
+    } else {
+      return null;
+    }
+  }
 
   Widget _buildColumn() {
     final columns = Column(
       children: List.generate(
         _rows,
-        (index) => Container(child: _buildRow(index)),
+        (index) => _buildRow(index),
       ),
     );
 
@@ -104,10 +147,15 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
     final cell = GestureDetector(
       onTap: () => setState(() {
         if (cellType == CellType.Wave) {
+          return;
         } else if (alreadyTapped) {
+          return;
         } else {
           _tapCount++;
           _tapped[rowIndex][columnIndex] = true;
+          if (cellType != CellType.None) {
+            _remainCount--;
+          }
         }
       }),
       child: Container(
@@ -116,90 +164,114 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
         decoration: BoxDecoration(
           border: Border.all(color: Colors.blue),
         ),
-        child: _buildCellCentent(cellType, alreadyTapped),
+        child: _buildCellContent(cellType, alreadyTapped),
       ),
     );
     return cell;
   }
 
-  Widget _buildCellCentent(CellType cellType, bool alreadyTapped) {
+  Widget _buildCellContent(CellType cellType, bool alreadyTapped) {
     if (alreadyTapped) {
       switch (cellType) {
         case CellType.Wave:
-          return Icon(Icons.waves);
+          return const Icon(Icons.waves);
         case CellType.None:
-          return Icon(Icons.check);
+          return const Icon(Icons.check);
         case CellType.ShipCircle:
-          return Container(
-            margin: EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.black,
-            ),
-          );
+          return _buildShipCircle();
         case CellType.ShipSquare:
-          return Container(
-            margin: EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              shape: BoxShape.rectangle,
-              color: Colors.black,
-            ),
-          );
+          return _buildShipSquare();
         case CellType.ShipRoundTop:
-          return Container(
-            margin: EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.0),
-                topRight: Radius.circular(20.0),
-              ),
-              color: Colors.black,
-            ),
-          );
+          return _buildShipRoundTop();
         case CellType.ShipRoundLeft:
-          return Container(
-            margin: EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.0),
-                bottomLeft: Radius.circular(20.0),
-              ),
-              color: Colors.black,
-            ),
-          );
+          return _buildShipRoundLeft();
         case CellType.ShipRoundBottom:
-          return Container(
-            margin: EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(20.0),
-                bottomRight: Radius.circular(20.0),
-              ),
-              color: Colors.black,
-            ),
-          );
+          return _buildShipRoundBottom();
         case CellType.ShipRoundRight:
-          return Container(
-            margin: EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(20.0),
-                bottomRight: Radius.circular(20.0),
-              ),
-              color: Colors.black,
-            ),
-          );
+          return _buildShipRoundRight();
         default:
           return Container();
       }
     } else {
       switch (cellType) {
         case CellType.Wave:
-          return Icon(Icons.waves);
+          return const Icon(Icons.waves);
         default:
           return Container();
       }
     }
+  }
+
+  Widget _buildShipCircle() {
+    return Container(
+      margin: EdgeInsets.all(5),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.black,
+      ),
+    );
+  }
+
+  Widget _buildShipSquare() {
+    return Container(
+      margin: EdgeInsets.all(5),
+      decoration: const BoxDecoration(
+        shape: BoxShape.rectangle,
+        color: Colors.black,
+      ),
+    );
+  }
+
+  Widget _buildShipRoundTop() {
+    return Container(
+      margin: EdgeInsets.all(5),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.0),
+          topRight: Radius.circular(20.0),
+        ),
+        color: Colors.black,
+      ),
+    );
+  }
+
+  Widget _buildShipRoundLeft() {
+    return Container(
+      margin: EdgeInsets.all(5),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.0),
+          bottomLeft: Radius.circular(20.0),
+        ),
+        color: Colors.black,
+      ),
+    );
+  }
+
+  Widget _buildShipRoundBottom() {
+    return Container(
+      margin: EdgeInsets.all(5),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(20.0),
+          bottomRight: Radius.circular(20.0),
+        ),
+        color: Colors.black,
+      ),
+    );
+  }
+
+  Widget _buildShipRoundRight() {
+    return Container(
+      margin: EdgeInsets.all(5),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(20.0),
+          bottomRight: Radius.circular(20.0),
+        ),
+        color: Colors.black,
+      ),
+    );
   }
 
   Widget _buildShipCount(List<CellType> cellTypes) {
@@ -226,10 +298,71 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
     );
   }
 
+  Widget _buildBottom() {
+    final column = Column(
+        children:
+            List.generate(_ships.length, (index) => _buildShips(_ships[index])));
+    return SizedBox(
+      width: 440,
+      height: 160,
+      child: column,
+    );
+  }
+
+  Widget _buildShips(Ship ship) {
+    return Row(
+      children: List.generate(ship.num, (index) => _buildShip(ship.size)),
+    );
+  }
+
+  Widget _buildShip(int size) {
+    if (size == 1) {
+      return SizedBox(
+        width: 40,
+        height: 40,
+        child: _buildShipCircle(),
+      );
+    } else {
+      List<Widget> row = [];
+      row.add(
+        SizedBox(
+          width: 40,
+          height: 40,
+          child: _buildShipRoundLeft(),
+        ),
+      );
+      for (var sizeIndex = 2; sizeIndex < size; sizeIndex++) {
+        row.add(
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: _buildShipSquare(),
+          ),
+        );
+      }
+      row.add(
+        SizedBox(
+          width: 40,
+          height: 40,
+          child: _buildShipRoundRight(),
+        ),
+      );
+      return SizedBox(
+        width: size * 40,
+        height: 40,
+        child: Row(children: row),
+      );
+    }
+  }
+
   void _pushReset() {
     setState(() {
       _tapCount = 0;
-      _cellTypes = CellTypeGenerator.generate(_rows, _columns);
+      _remainCount = _ships
+          .map((e) => e.size * e.num)
+          .reduce((value, element) => value + element);
+      _cellTypes =
+          _CellTypeGenerator(_rows, _columns, _ships, _waves).generate();
       for (var i = 0; i < _rows; i++) {
         for (var j = 0; j < _columns; j++) {
           _tapped[i][j] = false;
@@ -239,29 +372,27 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
   }
 }
 
-class CellTypeGenerator {
-  static const ship1 = Ship(1, 4);
-  static const ship2 = Ship(2, 3);
-  static const ship3 = Ship(3, 2);
-  static const ship4 = Ship(4, 1);
-  static const wave = 2;
+class _CellTypeGenerator {
+  final int _rows, _columns, _waves;
+  final List<Ship> _ships;
 
-  static List<List<CellType>> generate(int rows, int columns) {
+  _CellTypeGenerator(this._rows, this._columns, this._ships, this._waves);
+
+  List<List<CellType>> generate() {
     var cellTypes = List.generate(
-        rows, (_) => List.generate(columns, (_) => CellType.None));
+        _rows, (_) => List.generate(_columns, (_) => CellType.None));
 
-    var ships = [ship4, ship3, ship2, ship1];
-    for (var ship in ships) {
-      cellTypes = placeShip(cellTypes, ship, rows, columns);
+    for (var ship in _ships) {
+      cellTypes = placeShip(cellTypes, ship);
     }
-    cellTypes = placeWave(cellTypes, rows, columns);
+    cellTypes = placeWave(cellTypes);
 
     return cellTypes;
   }
 
-  static List<List<CellType>> placeShip(List<List<CellType>> cellTypes, Ship ship, int rows, int columns) {
+  List<List<CellType>> placeShip(List<List<CellType>> cellTypes, Ship ship) {
     for (var numIndex = 0; numIndex < ship.num; numIndex++) {
-      var positions = buildPositions(cellTypes, ship, rows, columns);
+      var positions = buildPositions(cellTypes, ship);
       if (positions.isEmpty) {
         continue;
       }
@@ -289,11 +420,11 @@ class CellTypeGenerator {
     return cellTypes;
   }
 
-  static List<List<CellType>> placeWave(List<List<CellType>> cellTypes, int rows, int columns) {
-    for (var i = 0; i < wave; i++) {
+  List<List<CellType>> placeWave(List<List<CellType>> cellTypes) {
+    for (var i = 0; i < _waves; i++) {
       List<Tuple2<int, int>> positions = [];
-      for (var row = 0; row < rows; row++) {
-        for (var column = 0; column < columns; column++) {
+      for (var row = 0; row < _rows; row++) {
+        for (var column = 0; column < _columns; column++) {
           if (cellTypes[row][column] == CellType.None) {
             positions.add(Tuple2(row, column));
           }
@@ -305,16 +436,15 @@ class CellTypeGenerator {
     return cellTypes;
   }
 
-  static List<Tuple3<Direction, int, int>> buildPositions(List<List<CellType>> cellTypes, Ship ship, int rows, int columns) {
+  List<Tuple3<Direction, int, int>> buildPositions(
+      List<List<CellType>> cellTypes, Ship ship) {
     List<Tuple3<Direction, int, int>> positions = [];
-    for (var row = 0; row < rows; row++) {
-      for (var column = 0; column < columns; column++) {
-        if (canExistsHorizontal(
-            cellTypes, ship, rows, row, columns, column)) {
+    for (var row = 0; row < _rows; row++) {
+      for (var column = 0; column < _columns; column++) {
+        if (canExistsHorizontal(cellTypes, ship, row, column)) {
           positions.add(Tuple3(Direction.Horizontal, row, column));
         }
-        if (canExistsVertical(
-            cellTypes, ship, rows, row, columns, column)) {
+        if (canExistsVertical(cellTypes, ship, row, column)) {
           positions.add(Tuple3(Direction.Vertical, row, column));
         }
       }
@@ -322,93 +452,46 @@ class CellTypeGenerator {
     return positions;
   }
 
-  static bool canExistsHorizontal(List<List<CellType>> cellTypes, Ship ship,
-      int rows, int row, int columns, int column) {
-    if (columns < column + ship.size) {
+  bool canExistsHorizontal(
+      List<List<CellType>> cellTypes, Ship ship, int row, int column) {
+    if (_columns < column + ship.size) {
       return false;
     }
-    // 左側チェック
-    if (0 < column) {
-      if (0 < row && cellTypes[row - 1][column - 1] != CellType.None) {
+    // 上下チェック
+    for (var i = column - 1; i <= column + ship.size; i++) {
+      if (i < 0 || _columns <= i) {
+        continue;
+      }
+      if (0 < row && cellTypes[row - 1][i] != CellType.None) {
         return false;
       }
-      if (cellTypes[row][column - 1] != CellType.None) {
+      if (cellTypes[row][i] != CellType.None) {
         return false;
       }
-      if (row + 1 < rows && cellTypes[row + 1][column - 1] != CellType.None) {
-        return false;
-      }
-    }
-    // 右側チェック
-    if (column + ship.size < columns) {
-      if (0 < row && cellTypes[row - 1][column + 1] != CellType.None) {
-        return false;
-      }
-      if (cellTypes[row][column + 1] != CellType.None) {
-        return false;
-      }
-      if (row + 1 < rows && cellTypes[row + 1][column + 1] != CellType.None) {
-        return false;
-      }
-    }
-    // 真ん中チェック
-    for (var sizeIndex = 0; sizeIndex < ship.size; sizeIndex++) {
-      if (0 < row && cellTypes[row - 1][column + sizeIndex] != CellType.None) {
-        return false;
-      }
-      if (cellTypes[row][column + sizeIndex] != CellType.None) {
-        return false;
-      }
-      if (row + 1 < rows &&
-          cellTypes[row + 1][column + sizeIndex] != CellType.None) {
+      if (row + 1 < _rows && cellTypes[row + 1][i] != CellType.None) {
         return false;
       }
     }
     return true;
   }
 
-  static bool canExistsVertical(List<List<CellType>> cellTypes, Ship ship,
-      int rows, int row, int columns, int column) {
-    if (rows < row + ship.size) {
+  bool canExistsVertical(
+      List<List<CellType>> cellTypes, Ship ship, int row, int column) {
+    if (_rows < row + ship.size) {
       return false;
     }
-    // 上側チェック
-    if (0 < row) {
-      if (0 < column && cellTypes[row - 1][column - 1] != CellType.None) {
+    // 左右チェック
+    for (var i = row - 1; i <= row + ship.size; i++) {
+      if (i < 0 || _rows <= i) {
+        continue;
+      }
+      if (0 < column && cellTypes[i][column - 1] != CellType.None) {
         return false;
       }
-      if (cellTypes[row - 1][column] != CellType.None) {
+      if (cellTypes[i][column] != CellType.None) {
         return false;
       }
-      if (column + 1 < columns &&
-          cellTypes[row - 1][column + 1] != CellType.None) {
-        return false;
-      }
-    }
-    // 下側チェック
-    if (row + ship.size < rows) {
-      if (0 < column && cellTypes[row + 1][column - 1] != CellType.None) {
-        return false;
-      }
-      if (cellTypes[row + 1][column] != CellType.None) {
-        return false;
-      }
-      if (column + 1 < columns &&
-          cellTypes[row + 1][column + 1] != CellType.None) {
-        return false;
-      }
-    }
-    // 真ん中チェック
-    for (var sizeIndex = 0; sizeIndex < ship.size; sizeIndex++) {
-      if (0 < column &&
-          cellTypes[row + sizeIndex][column - 1] != CellType.None) {
-        return false;
-      }
-      if (cellTypes[row + sizeIndex][column] != CellType.None) {
-        return false;
-      }
-      if (column + 1 < columns &&
-          cellTypes[row + sizeIndex][column + 1] != CellType.None) {
+      if (column + 1 < _columns && cellTypes[i][column + 1] != CellType.None) {
         return false;
       }
     }
