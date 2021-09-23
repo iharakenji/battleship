@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:tuple/tuple.dart';
 
@@ -47,6 +46,10 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
   late int _remainCount;
   late List<List<CellType>> _cellTypes;
   late List<List<bool>> _tapped;
+  late Size _screenSize;
+  late Orientation _orientation;
+  static const _cellSizeMax = 40.0;
+  late double _cellSize;
 
   _BattleshipHomeState(this._rows, this._columns, this._ships, this._waves);
 
@@ -63,50 +66,85 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
 
   @override
   Widget build(BuildContext context) {
+    _screenSize = MediaQuery.of(context).size;
+    _orientation = MediaQuery.of(context).orientation;
+    switch (_orientation) {
+      case Orientation.landscape:
+        _cellSize = [
+          _screenSize.width / 18,
+          _screenSize.height / 13,
+          _cellSizeMax
+        ].reduce(min);
+        break;
+      case Orientation.portrait:
+        _cellSize = [
+          _screenSize.width / 12,
+          _screenSize.height / 19,
+          _cellSizeMax
+        ].reduce(min);
+        break;
+    }
+
     return _buildContainer();
   }
 
-  Widget _buildContainer() => Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const SizedBox(height: 20),
+  Widget _buildContainer() => Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: _cellSizeMax / 2),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             ElevatedButton(
               onPressed: () => _pushReset(),
               child: const Text('Reset'),
             ),
-            const SizedBox(width: 20),
-            Text('TapCount: $_tapCount'),
+            const SizedBox(width: _cellSizeMax / 2),
+            Text('Tap: $_tapCount'),
+            const SizedBox(width: _cellSizeMax / 2),
+            Text('Remain: $_remainCount'),
           ]),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: 440,
-            height: 440,
-            child: Stack(
-              children: [
-                Center(
-                  child: Container(
-                    child: _buildClearText(),
-                  ),
-                ),
-                _buildColumn(),
-              ],
+          const SizedBox(height: _cellSizeMax / 2),
+          _buildMainContainer(),
+        ],
+      );
+
+  Widget _buildMainContainer() {
+    switch (_orientation) {
+      case Orientation.landscape:
+        return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _buildArea(),
+          _buildBottom(),
+        ]);
+      case Orientation.portrait:
+        return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _buildArea(),
+          _buildBottom(),
+        ]);
+    }
+  }
+
+  Widget _buildArea() => SizedBox(
+        width: _cellSize * 11,
+        height: _cellSize * 11,
+        child: Stack(
+          children: [
+            _buildColumn(),
+            Center(
+              child: Container(
+                child: _buildClearText(),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-            child: _buildBottom(),
-          ),
-        ]),
+          ],
+        ),
       );
 
   Widget? _buildClearText() {
     if (_remainCount == 0) {
-      return Text(
+      return const Text(
         "Clear!!",
         style: TextStyle(
           fontWeight: FontWeight.bold,
-          fontSize: 50.0,
-          color: Colors.pink[500],
+          fontSize: 60.0,
+          color: Colors.pink,
         ),
       );
     } else {
@@ -159,8 +197,8 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
         }
       }),
       child: Container(
-        width: 40,
-        height: 40,
+        width: _cellSize,
+        height: _cellSize,
         decoration: BoxDecoration(
           border: Border.all(color: Colors.blue),
         ),
@@ -202,77 +240,65 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
     }
   }
 
-  Widget _buildShipCircle() {
-    return Container(
-      margin: EdgeInsets.all(5),
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.black,
-      ),
-    );
-  }
-
-  Widget _buildShipSquare() {
-    return Container(
-      margin: EdgeInsets.all(5),
-      decoration: const BoxDecoration(
-        shape: BoxShape.rectangle,
-        color: Colors.black,
-      ),
-    );
-  }
-
-  Widget _buildShipRoundTop() {
-    return Container(
-      margin: EdgeInsets.all(5),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.0),
-          topRight: Radius.circular(20.0),
+  Widget _buildShipCircle() => Container(
+        margin: EdgeInsets.all(_cellSize / 4),
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black,
         ),
-        color: Colors.black,
-      ),
-    );
-  }
+      );
 
-  Widget _buildShipRoundLeft() {
-    return Container(
-      margin: EdgeInsets.all(5),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.0),
-          bottomLeft: Radius.circular(20.0),
+  Widget _buildShipSquare() => Container(
+        margin: EdgeInsets.all(_cellSize / 4),
+        decoration: const BoxDecoration(
+          shape: BoxShape.rectangle,
+          color: Colors.black,
         ),
-        color: Colors.black,
-      ),
-    );
-  }
+      );
 
-  Widget _buildShipRoundBottom() {
-    return Container(
-      margin: EdgeInsets.all(5),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(20.0),
-          bottomRight: Radius.circular(20.0),
+  Widget _buildShipRoundTop() => Container(
+        margin: EdgeInsets.all(_cellSize / 4),
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(_cellSizeMax / 2),
+            topRight: Radius.circular(_cellSizeMax / 2),
+          ),
+          color: Colors.black,
         ),
-        color: Colors.black,
-      ),
-    );
-  }
+      );
 
-  Widget _buildShipRoundRight() {
-    return Container(
-      margin: EdgeInsets.all(5),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(20.0),
-          bottomRight: Radius.circular(20.0),
+  Widget _buildShipRoundLeft() => Container(
+        margin: EdgeInsets.all(_cellSize / 4),
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(_cellSizeMax / 2),
+            bottomLeft: Radius.circular(_cellSizeMax / 2),
+          ),
+          color: Colors.black,
         ),
-        color: Colors.black,
-      ),
-    );
-  }
+      );
+
+  Widget _buildShipRoundBottom() => Container(
+        margin: EdgeInsets.all(_cellSize / 4),
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(_cellSizeMax / 2),
+            bottomRight: Radius.circular(_cellSizeMax / 2),
+          ),
+          color: Colors.black,
+        ),
+      );
+
+  Widget _buildShipRoundRight() => Container(
+        margin: EdgeInsets.all(_cellSize / 4),
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.only(
+            topRight: Radius.circular(_cellSizeMax / 2),
+            bottomRight: Radius.circular(_cellSizeMax / 2),
+          ),
+          color: Colors.black,
+        ),
+      );
 
   Widget _buildShipCount(List<CellType> cellTypes) {
     final shipCount = cellTypes.where((cellType) {
@@ -289,9 +315,9 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
       }
     }).length;
 
-    return Container(
-      width: 40,
-      height: 40,
+    return SizedBox(
+      width: _cellSize,
+      height: _cellSize,
       child: Center(
           child:
               Text(shipCount.toString(), style: const TextStyle(fontSize: 18))),
@@ -300,11 +326,11 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
 
   Widget _buildBottom() {
     final column = Column(
-        children:
-            List.generate(_ships.length, (index) => _buildShips(_ships[index])));
+        children: List.generate(
+            _ships.length, (index) => _buildShips(_ships[index])));
     return SizedBox(
-      width: 440,
-      height: 160,
+      width: _cellSize * 6,
+      height: _cellSize * 4,
       child: column,
     );
   }
@@ -318,38 +344,38 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
   Widget _buildShip(int size) {
     if (size == 1) {
       return SizedBox(
-        width: 40,
-        height: 40,
+        width: _cellSize,
+        height: _cellSize,
         child: _buildShipCircle(),
       );
     } else {
       List<Widget> row = [];
       row.add(
         SizedBox(
-          width: 40,
-          height: 40,
+          width: _cellSize,
+          height: _cellSize,
           child: _buildShipRoundLeft(),
         ),
       );
       for (var sizeIndex = 2; sizeIndex < size; sizeIndex++) {
         row.add(
           SizedBox(
-            width: 40,
-            height: 40,
+            width: _cellSize,
+            height: _cellSize,
             child: _buildShipSquare(),
           ),
         );
       }
       row.add(
         SizedBox(
-          width: 40,
-          height: 40,
+          width: _cellSize,
+          height: _cellSize,
           child: _buildShipRoundRight(),
         ),
       );
       return SizedBox(
-        width: size * 40,
-        height: 40,
+        width: size * _cellSize,
+        height: _cellSize,
         child: Row(children: row),
       );
     }
