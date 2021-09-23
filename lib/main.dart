@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:tuple/tuple.dart';
 
@@ -50,6 +51,7 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
   late Orientation _orientation;
   static const _cellSizeMax = 40.0;
   late double _cellSize;
+  final _player = AudioCache(fixedPlayer: AudioPlayer());
 
   _BattleshipHomeState(this._rows, this._columns, this._ships, this._waves);
 
@@ -62,6 +64,7 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
     _cellTypes = _CellTypeGenerator(_rows, _columns, _ships, _waves).generate();
     _tapped =
         List.generate(_rows, (_) => List.generate(_columns, (_) => false));
+    _player.loadAll(['se_saa01.wav', 'se_sad03.wav']);
   }
 
   @override
@@ -140,7 +143,7 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
   Widget? _buildClearText() {
     if (_remainCount == 0) {
       return const Text(
-        "Clear!!",
+        "Clear!",
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 60.0,
@@ -193,6 +196,9 @@ class _BattleshipHomeState extends State<_BattleshipHome> {
           _tapped[rowIndex][columnIndex] = true;
           if (cellType != CellType.None) {
             _remainCount--;
+            _player.play('se_sad03.wav');
+          } else {
+            _player.play('se_saa01.wav');
           }
         }
       }),
