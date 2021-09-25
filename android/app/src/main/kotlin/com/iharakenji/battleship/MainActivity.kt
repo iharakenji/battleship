@@ -1,4 +1,4 @@
-package com.example.battleship
+package com.iharakenji.battleship
 
 import io.flutter.embedding.android.FlutterActivity
 
